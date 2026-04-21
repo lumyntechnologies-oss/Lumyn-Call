@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { ClerkProvider } from '@clerk/nextjs'
 import { Analytics } from '@vercel/analytics/next'
@@ -9,27 +9,22 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'Lumyn Call',
+  title: 'Lumyn',
   description: 'Smart contact management and call launcher',
-  generator: 'v0.app',
   manifest: '/manifest.json',
   icons: {
     icon: [
       {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
+        url: '/image (33).jpg',
+        type: 'image/jpeg',
       },
     ],
-    apple: '/apple-icon.png',
+    apple: '/image (33).jpg',
   },
+}
+
+export const viewport: Viewport = {
+  themeColor: '#8b5cf6',
 }
 
 export default function RootLayout({
@@ -41,10 +36,11 @@ export default function RootLayout({
     <ClerkProvider>
       <html lang="en">
         <head>
+          <link rel="icon" href="/image (33).jpg" />
           <meta name="apple-mobile-web-app-capable" content="yes" />
           <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
           <meta name="apple-mobile-web-app-title" content="Lumyn" />
-          <meta name="theme-color" content="#000000" />
+          <meta name="theme-color" content="#8b5cf6" />
         </head>
         <body className="font-sans antialiased bg-background">
           <PWAProvider />

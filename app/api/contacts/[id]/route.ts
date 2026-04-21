@@ -1,9 +1,15 @@
 import { auth } from '@clerk/nextjs/server'
-import { prisma } from '@/lib/db'
+import { getDb, getMockContacts, getMockUser, useMockData } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
 
 async function getUserId(clerkId: string) {
-  const user = await prisma.user.findUnique({
+  if (useMockData()) {
+    const user = getMockUser(clerkId)
+    return user.id
+  }
+
+  const db = getDb()
+  const user = await db.user.findUnique({
     where: { clerkId },
     select: { id: true }
   })
@@ -22,13 +28,24 @@ export async function GET(
     }
 
     const { id } = await params
+
+    if (useMockData()) {
+      const contacts = getMockContacts(userId)
+      const contact = contacts.find(c => c.id === id)
+      if (!contact) {
+        return NextResponse.json({ error: 'Contact not found' }, { status: 404 })
+      }
+      return NextResponse.json(contact)
+    }
+
     const dbUserId = await getUserId(userId)
 
     if (!dbUserId) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const contact = await prisma.contact.findFirst({
+    const db = getDb()
+    const contact = await db.contact.findFirst({
       where: { id, userId: dbUserId }
     })
 
@@ -61,13 +78,18 @@ export async function PUT(
     const body = await request.json()
     const { name, phone_number, email, platform, username, bio } = body
 
+    if (useMockData()) {
+      return NextResponse.json({ id, name, phone_number, email, platform, username, bio })
+    }
+
     const dbUserId = await getUserId(userId)
 
     if (!dbUserId) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const contact = await prisma.contact.updateMany({
+    const db = getDb()
+    const contact = await db.contact.updateMany({
       where: { id, userId: dbUserId },
       data: {
         ...(name && { name }),
@@ -84,7 +106,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Contact not found' }, { status: 404 })
     }
 
-    const updated = await prisma.contact.findUnique({ where: { id } })
+    const updated = await db.contact.findUnique({ where: { id } })
     return NextResponse.json(updated)
   } catch (error) {
     console.error('Error updating contact:', error)
@@ -107,13 +129,19 @@ export async function DELETE(
     }
 
     const { id } = await params
+
+    if (useMockData()) {
+      return NextResponse.json({ success: true })
+    }
+
     const dbUserId = await getUserId(userId)
 
     if (!dbUserId) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const contact = await prisma.contact.deleteMany({
+    const db = getDb()
+    const contact = await db.contact.deleteMany({
       where: { id, userId: dbUserId }
     })
 
