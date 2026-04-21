@@ -1,12 +1,13 @@
 import { auth } from '@clerk/nextjs/server'
-import { neon } from '@neondatabase/serverless'
+import { prisma } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
 
-const db = neon(process.env.DATABASE_URL!)
-
 async function getUserId(clerkId: string) {
-  const result = await db`SELECT id FROM users WHERE clerk_id = ${clerkId}`
-  return result[0]?.id
+  const user = await prisma.user.findUnique({
+    where: { clerkId },
+    select: { id: true }
+  })
+  return user?.id
 }
 
 export async function GET(
@@ -27,16 +28,15 @@ export async function GET(
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const contact = await db`
-      SELECT * FROM contacts
-      WHERE id = ${id} AND user_id = ${dbUserId}
-    `
+    const contact = await prisma.contact.findFirst({
+      where: { id, userId: dbUserId }
+    })
 
-    if (contact.length === 0) {
+    if (!contact) {
       return NextResponse.json({ error: 'Contact not found' }, { status: 404 })
     }
 
-    return NextResponse.json(contact[0])
+    return NextResponse.json(contact)
   } catch (error) {
     console.error('Error fetching contact:', error)
     return NextResponse.json(
@@ -67,25 +67,25 @@ export async function PUT(
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const result = await db`
-      UPDATE contacts
-      SET 
-        name = COALESCE(${name || null}, name),
-        phone_number = COALESCE(${phone_number || null}, phone_number),
-        email = COALESCE(${email || null}, email),
-        platform = COALESCE(${platform || null}, platform),
-        username = COALESCE(${username || null}, username),
-        bio = COALESCE(${bio || null}, bio),
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = ${id} AND user_id = ${dbUserId}
-      RETURNING *
-    `
+    const contact = await prisma.contact.updateMany({
+      where: { id, userId: dbUserId },
+      data: {
+        ...(name && { name }),
+        ...(phone_number !== undefined && { phoneNumber: phone_number }),
+        ...(email !== undefined && { email }),
+        ...(platform !== undefined && { platform }),
+        ...(username !== undefined && { username }),
+        ...(bio !== undefined && { bio }),
+        updatedAt: new Date()
+      }
+    })
 
-    if (result.length === 0) {
+    if (contact.count === 0) {
       return NextResponse.json({ error: 'Contact not found' }, { status: 404 })
     }
 
-    return NextResponse.json(result[0])
+    const updated = await prisma.contact.findUnique({ where: { id } })
+    return NextResponse.json(updated)
   } catch (error) {
     console.error('Error updating contact:', error)
     return NextResponse.json(
@@ -113,13 +113,11 @@ export async function DELETE(
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const result = await db`
-      DELETE FROM contacts
-      WHERE id = ${id} AND user_id = ${dbUserId}
-      RETURNING id
-    `
+    const contact = await prisma.contact.deleteMany({
+      where: { id, userId: dbUserId }
+    })
 
-    if (result.length === 0) {
+    if (contact.count === 0) {
       return NextResponse.json({ error: 'Contact not found' }, { status: 404 })
     }
 

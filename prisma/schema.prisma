@@ -1,0 +1,55 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  clerkId  String   @unique @map("clerk_id")
+  email    String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  contacts  Contact[]
+  callLogs CallLog[]
+
+  @@map("users")
+}
+
+model Contact {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  name        String
+  phoneNumber String?  @map("phone_number")
+  email       String?
+  platform    String   @default("whatsapp")
+  username    String?
+  bio         String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @map("updated_at")
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  callLogs   CallLog[]
+
+  @@index([userId])
+  @@map("contacts")
+}
+
+model CallLog {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  contactId       String?  @map("contact_id")
+  platform        String
+  durationSeconds Int      @default(0) @map("duration_seconds")
+  notes           String?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contact        Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([contactId])
+  @@map("call_logs")
+}

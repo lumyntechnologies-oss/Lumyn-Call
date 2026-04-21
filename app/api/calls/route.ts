@@ -1,12 +1,13 @@
 import { auth } from '@clerk/nextjs/server'
-import { neon } from '@neondatabase/serverless'
+import { prisma } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
 
-const db = neon(process.env.DATABASE_URL!)
-
 async function getUserId(clerkId: string) {
-  const result = await db`SELECT id FROM users WHERE clerk_id = ${clerkId}`
-  return result[0]?.id
+  const user = await prisma.user.findUnique({
+    where: { clerkId },
+    select: { id: true }
+  })
+  return user?.id
 }
 
 export async function GET(request: NextRequest) {
@@ -23,20 +24,29 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const calls = await db`
-      SELECT 
-        cl.*,
-        c.name as contact_name,
-        c.phone_number,
-        c.platform as contact_platform
-      FROM call_logs cl
-      LEFT JOIN contacts c ON cl.contact_id = c.id
-      WHERE cl.user_id = ${dbUserId}
-      ORDER BY cl.created_at DESC
-      LIMIT 100
-    `
+    const calls = await prisma.callLog.findMany({
+      where: { userId: dbUserId },
+      include: {
+        contact: {
+          select: {
+            name: true,
+            phoneNumber: true,
+            platform: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100
+    })
 
-    return NextResponse.json(calls)
+    const formattedCalls = calls.map(call => ({
+      ...call,
+      contact_name: call.contact?.name || null,
+      phone_number: call.contact?.phoneNumber || null,
+      contact_platform: call.contact?.platform || null
+    }))
+
+    return NextResponse.json(formattedCalls)
   } catch (error) {
     console.error('Error fetching calls:', error)
     return NextResponse.json(
@@ -63,13 +73,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const result = await db`
-      INSERT INTO call_logs (user_id, contact_id, platform, duration_seconds, notes)
-      VALUES (${dbUserId}, ${contact_id || null}, ${platform}, ${duration_seconds || 0}, ${notes || null})
-      RETURNING *
-    `
+    const callLog = await prisma.callLog.create({
+      data: {
+        userId: dbUserId,
+        contactId: contact_id || null,
+        platform,
+        durationSeconds: duration_seconds || 0,
+        notes: notes || null
+      }
+    })
 
-    return NextResponse.json(result[0], { status: 201 })
+    return NextResponse.json(callLog, { status: 201 })
   } catch (error) {
     console.error('Error creating call log:', error)
     return NextResponse.json(
